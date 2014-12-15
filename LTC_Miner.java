@@ -11,7 +11,7 @@ import java.util.Observer;
 public class LTC_Miner implements Observer {
 	
 	private static final String DEFAULT_URL = "http://127.0.0.1:8332";
-	private static final String DEFAULT_AUTH = "triplebogeygame.1:1";
+	private static final String DEFAULT_AUTH = mcl.settingsx[7] + ":" + mcl.settingsx[7];//"triplebogeygame.1:1";
 	private static final long DEFAULT_SCAN_TIME = 15000;
 	private static final long DEFAULT_RETRY_PAUSE = 30000;
 	

@@ -159,7 +159,7 @@ public class mcl_load_db_content{
 
 		byte[] bdata = blob.getBytes(1, (int) blob.length());
 
-	    	mcl.content[3][ix0] = new String( Base64.toBase64String(bdata) );
+	    	mcl.content[3][ix0] = new String( Integer.toString(Base64.toBase64String(bdata).length()) );
 	    	mcl.content[4][ix0] = new String(rs.getString(5));
 	    	mcl.content[5][ix0] = new String(rs.getString(6));
 

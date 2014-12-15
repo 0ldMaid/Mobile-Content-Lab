@@ -32,9 +32,21 @@ import java.awt.image.*;
 
 import javax.swing.border.Border;
 
+import java.util.Arrays;
+import java.util.Comparator;
+
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.security.SignatureException;
+import java.security.Signature;
+import java.security.spec.X509EncodedKeySpec;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.KeyPair;
 import java.security.KeyFactory;
 import java.security.KeyPairGenerator;
+import java.security.Signature;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 
 import org.spongycastle.util.encoders.Base64;
 
@@ -51,12 +63,22 @@ import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import java.lang.ProcessBuilder;
+
+
+
+
+
+
+
 
 
 
 
 
 public class mcl extends JFrame implements ActionListener{
+
+Process p;
 
 Dimension scrSize = Toolkit.getDefaultToolkit().getScreenSize();
 int xzx = 700;
@@ -130,6 +152,7 @@ static int content_window_size = 0;
 static int hide_console = 0;
 static int console_showing = 1;
 static int new_window_showing = 0;
+static int old_content_length = 0;
 int screen_x = 0;
 int screen_y = 0;
 int ix0 = 0;
@@ -166,7 +189,7 @@ JLabel status7 = new JLabel("", JLabel.LEFT);
 JLabel status8 = new JLabel("", JLabel.LEFT);
 JLabel status9 = new JLabel("", JLabel.LEFT);
 
-Label status_x1 = new Label("Loading...", Label.LEFT);
+Label status_x1 = new Label("loading...", Label.LEFT);
 
 Label status_ax1 = new Label("loading...", Label.LEFT);
 Label status_ax2 = new Label("loading...", Label.LEFT);
@@ -176,7 +199,7 @@ JLabel mining_status = new JLabel("Starting...", JLabel.LEFT);
 JLabel info_mining_1_l = new JLabel("Your computer will mine for LTC to support the provider.", JLabel.LEFT);
 JLabel info_mining_2_l = new JLabel("Your Stats:", JLabel.LEFT);
 
-JLabel info_urlx_l = new JLabel("Stratum Proxie:", JLabel.RIGHT);
+JLabel info_urlx_l = new JLabel("Stratum Proxy:", JLabel.RIGHT);
 JLabel info_user_l = new JLabel("User:", JLabel.RIGHT);
 JLabel info_pass_l = new JLabel("Pass:", JLabel.RIGHT);
 
@@ -253,7 +276,7 @@ mcl(){//************************************************************************
 	setLocation(cenx, ceny);
 	setResizable(true);
 	setAlwaysOnTop(false);
-        addWindowListener(new WindowAdapter(){public void windowClosing(WindowEvent e){savex(); System.exit(0);}});
+        addWindowListener(new WindowAdapter(){public void windowClosing(WindowEvent e){setVisible(true); p.destroy(); savex(); System.exit(0);}});
 
         requestFocus();
 
@@ -269,7 +292,6 @@ mcl(){//************************************************************************
 	lomx1 = new ImageIcon(this.getClass().getResource("images/internet_earth.png"));
 	lomx2 = new ImageIcon(this.getClass().getResource("images/save.png"));
 	lomx3 = new ImageIcon(this.getClass().getResource("images/file_delete.png"));
-
 
 
 
@@ -532,16 +554,18 @@ mcl(){//************************************************************************
 	add_miner_pass.addActionListener(this);
 
 
+
+
 	accountMenu.add(add_contentp);
 	accountMenu.addSeparator();
 	accountMenu.add(show_prikey);
 	accountMenu.add(show_pubkey);
 	accountMenu.add(signm);
 	accountMenu.add(verifym);
-	accountMenu.addSeparator();
-	accountMenu.add(add_miner_url);
-	accountMenu.add(add_miner_user);
-	accountMenu.add(add_miner_pass);
+	//accountMenu.addSeparator();
+	//accountMenu.add(add_miner_url);
+	//accountMenu.add(add_miner_user);
+	//accountMenu.add(add_miner_pass);
 
 
 
@@ -606,6 +630,7 @@ mcl(){//************************************************************************
 	rebuild_content();
 
 
+
 	if(settingsx[0].equals("xxx1")){build_keys();}
 
 
@@ -624,9 +649,33 @@ mcl(){//************************************************************************
 	xtimerx = new Timer();
 	xtimerx.schedule(new RemindTask_engine(), 0);
 
+	//start the server
+	toolkit = Toolkit.getDefaultToolkit();
+	xtimerx = new Timer();
+	xtimerx.schedule(new RemindTask_server(), 0);
+
+	//start the client
+	toolkit = Toolkit.getDefaultToolkit();
+	xtimerx = new Timer();
+	xtimerx.schedule(new RemindTask_client(), 0);
+
+	//start the proxy
+	toolkit = Toolkit.getDefaultToolkit();
+	xtimerx = new Timer();
+	xtimerx.schedule(new RemindTask_miner_proxy(), 0);
 
 
 }//*****************************************************************************
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -689,6 +738,8 @@ mcl(){//************************************************************************
 
 	public void build_keys(){
 
+	status_x1.setText("build keys");
+
 	try{
 
     	KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
@@ -722,6 +773,8 @@ mcl(){//************************************************************************
 
 	public void run(){//**************************************************************************************
 
+	status_x1.setText("start miner");
+
 	try{
 	LTC_Miner minerx = new LTC_Miner("http://127.0.0.1:8332","triplebogeygame.1:1",5000,30000,2,1.0);
 	}catch(Exception e){e.printStackTrace();}
@@ -736,13 +789,15 @@ mcl(){//************************************************************************
 
 	public void run(){//**************************************************************************************
 
-	while(1 == 1){
+	while(true){
 
+	if(content[0].length > old_content_length){rebuild_content(); old_content_length = content[0].length;}	
 
+	info_urlx.setText(settingsx[6]);
+	info_user.setText(settingsx[7]);
+	info_pass.setText(settingsx[8]);
 
 	mining_status.setText(mining_speed);
-
-
 
 	try{Thread.sleep(1000);} catch(InterruptedException e){}
 
@@ -759,6 +814,28 @@ mcl(){//************************************************************************
 
 
 
+	class RemindTask_server extends TimerTask{
+	Runtime rxrunti = Runtime.getRuntime();
+
+	public void run(){//**************************************************************************************
+
+	mcl_server mclc = new mcl_server();
+
+	}//runx***************************************************************************************************
+        }//remindtask
+
+
+	class RemindTask_client extends TimerTask{
+	Runtime rxrunti = Runtime.getRuntime();
+
+	public void run(){//**************************************************************************************
+
+	if(!settingsx[1].equals(settingsx[5])){mcl_client mclc = new mcl_client();}
+
+	}//runx***************************************************************************************************
+        }//remindtask
+
+
 
 
 
@@ -773,7 +850,7 @@ mcl(){//************************************************************************
 	public void run(){//**************************************************************************************
 
 
-
+		status_x1.setText("open window");
 
 		mcl_import_content mic = new mcl_import_content();
 
@@ -794,6 +871,60 @@ mcl(){//************************************************************************
 
 	}//runx***************************************************************************************************
         }//remindtask
+
+
+
+
+
+
+
+	class RemindTask_miner_proxy extends TimerTask{
+	Runtime rxrunti = Runtime.getRuntime();
+
+	public void run(){//**************************************************************************************
+
+	status_x1.setText("start miner proxy");
+	System.out.println("start miner proxy");
+
+	try {
+
+      	String line;
+      	p = Runtime.getRuntime().exec("mining_proxy.exe");
+
+
+	System.out.println("printing");
+
+      	BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+	BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+      	while ((line = error.readLine()) != null) {
+        System.out.println("line " + line);
+      	}//****************************************
+
+      	while ((line = input.readLine()) != null) {
+        System.out.println("line " + line);
+      	}//****************************************
+
+      	input.close();
+
+
+    	}catch (Exception err) {err.printStackTrace();}
+
+
+
+
+	}//runx***************************************************************************************************
+        }//remindtask
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -827,6 +958,8 @@ mcl(){//************************************************************************
 
 	public String get_file(){
 
+	status_x1.setText("import file");
+
 	String content1 = new String("");
 
 	try{
@@ -857,6 +990,8 @@ mcl(){//************************************************************************
 
 		System.out.println("size " + content1.length());
 
+		fis.close();
+		bos.close();
 
 	}catch(Exception e){e.printStackTrace();}
 
@@ -872,7 +1007,9 @@ mcl(){//************************************************************************
 
 	public void make_new_content(){
 
-	if(!settingsx[1].equals(settingsx[1])){JOptionPane.showMessageDialog(null, "You can not add content, because you are not the content provider.\nYou are already following someone else.");}
+	status_x1.setText("save new content");
+
+	if(!settingsx[1].equals(settingsx[5])){JOptionPane.showMessageDialog(null, "You can not add content, because you are not the content provider.\nYou are already following someone else.");}
 	else{
 
 	System.out.println("Make New Content");
@@ -903,12 +1040,19 @@ mcl(){//************************************************************************
 
 
 	String contentx = new String("");
+	String signx = new String("");
 
-	if(import5.length() > 0){contentx = get_file();}
-	else{
+	if(import5.length() > 0){
+
+		contentx = get_file();
+		signx = sign_message(contentx);
+
+	}//**********************
+	else{//
 
 		byte[] bytes = import4.getBytes();
 		contentx = Base64.toBase64String(bytes);
+		signx = sign_message(contentx);
 
 	}//else
 
@@ -919,7 +1063,7 @@ mcl(){//************************************************************************
 	newc[2][runx] = new String(import1 + "\n" + import2 + "\n" + import3);
 	newc[3][runx] = new String(contentx);
 	newc[4][runx] = new String(import6);
-	newc[5][runx] = new String("signature");
+	newc[5][runx] = new String(signx);
 
 	content = newc;
 
@@ -938,11 +1082,96 @@ mcl(){//************************************************************************
 
 
 
+	public String sign_message(String text){
+
+	String returnx = new String("");
+
+	try{
+
+        byte[] message = Base64.decode(text);
+
+	byte[] clear = Base64.decode(settingsx[0]);
+    	PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(clear);
+    	KeyFactory fact = KeyFactory.getInstance("RSA");
+    	PrivateKey priv = fact.generatePrivate(keySpec);
+    	Arrays.fill(clear, (byte) 0);
+
+    	Signature sigx = Signature.getInstance("SHA1WithRSA");//MD5WithRSA
+    	sigx.initSign(priv);
+    	sigx.update(message);
+    	byte[] signatureBytesx = sigx.sign();
+    	//System.out.println("Public: " + Base64.toBase64String(pub.getEncoded()));
+    	//System.out.println("Singature 3: " + Base64.toBase64String(signatureBytesx));
+
+	byte[] clear2 = Base64.decode(settingsx[1]);
+    	X509EncodedKeySpec keySpec2 = new X509EncodedKeySpec(clear2);
+    	KeyFactory fact2 = KeyFactory.getInstance("RSA");
+    	PublicKey publ2 = fact2.generatePublic(keySpec2);
+    	Arrays.fill(clear2, (byte) 0);
+
+        sigx.initVerify(publ2);
+        sigx.update(message);
+
+        System.out.println("SIGN >>> " + sigx.verify(signatureBytesx));
+    	String signxx = Base64.toBase64String(signatureBytesx);
+
+	returnx = signxx;
+
+
+	System.out.println("key " + mcl.settingsx[5]);
+	System.out.println("content " + text);
+	System.out.println("sig " + signxx);
+
+
+
+	//test
+
+        byte[] message2 = Base64.decode(text);
+
+	byte[] clear3 = Base64.decode(mcl.settingsx[5]);
+    	X509EncodedKeySpec keySpec3 = new X509EncodedKeySpec(clear3);
+    	KeyFactory fact3 = KeyFactory.getInstance("RSA");
+    	PublicKey publ3 = fact3.generatePublic(keySpec3);
+    	Arrays.fill(clear3, (byte) 0);
+
+	byte[] signatureBytesx2 = Base64.decode(signxx);
+
+    	Signature sigx3 = Signature.getInstance("SHA1WithRSA");//MD5WithRSA
+        sigx3.initVerify(publ3);
+        sigx3.update(message2);
+        System.out.println(">> ST >> " + sigx3.verify(signatureBytesx2));
+
+	//test
+
+
+
+
+
+
+
+
+
+	}catch(Exception e){e.printStackTrace();}
+
+
+
+	return returnx;
+
+	}//**************************************
+
+
+
+
+
+
+
 
 
 
 
 	public void rebuild_content(){
+
+	status_x1.setText("set display");
 
 	int cont = 0;
 
@@ -1058,21 +1287,10 @@ mcl(){//************************************************************************
 		  public void actionPerformed(ActionEvent e){
 
 		
-			byte[] bytes = Base64.decode(content[3][holdx]);
 
-			try{
-		
-			//below is the different part
-        		File someFile = new File("content/" + content[4][holdx]);
-        		FileOutputStream fos = new FileOutputStream(someFile);
-        		fos.write(bytes);
-        		fos.flush();
-        		fos.close();
+			mcl_export_db_content exportx = new mcl_export_db_content(holdx);
 
 
-			JOptionPane.showMessageDialog(null, "Content Exported: ..\\content\\" + content[4][holdx]);
-
-			}catch(Exception ex){ex.printStackTrace();}
 
 		  }//****************************************
 		});
@@ -1128,6 +1346,69 @@ mcl(){//************************************************************************
 
 
 
+	public void add_content_key(){
+
+	String response2 = JOptionPane.showInputDialog(null, "Enter the Public Key of the party you wish to support.", "Public Key", JOptionPane.QUESTION_MESSAGE);
+
+	try{
+
+	    if(response2.length() > 0){settingsx[5] = response2;}//************************
+
+	}catch(Exception e){System.out.println("Nothing was entered.");}
+
+	}//***************************
+
+
+
+
+
+
+
+	public void push_new_content(){
+
+	if(settingsx[1].equals(settingsx[5])){mcl_push pushx = new mcl_push();}
+	else{JOptionPane.showMessageDialog(null, "You are not the content provider!");}		
+
+	}//****************************
+
+
+
+
+
+
+
+
+
+	public void add_miner_url_go(){
+
+	String response2 = JOptionPane.showInputDialog(null, "Enter the Miner URL of your mining pool.", "Miner URL", JOptionPane.QUESTION_MESSAGE);
+
+	if(response2.length() > 0){settingsx[6] = response2;}//************************
+
+	}//***************************
+
+
+
+	public void add_miner_user_go(){
+
+	String response2 = JOptionPane.showInputDialog(null, "Enter the Miner User Name of your mining pool.", "Miner User", JOptionPane.QUESTION_MESSAGE);
+
+	if(response2.length() > 0){settingsx[7] = response2;}//************************
+
+	}//***************************
+
+
+
+	public void add_miner_pass_go(){
+
+	String response2 = JOptionPane.showInputDialog(null, "Enter the Miner Password of your mining pool.", "Miner Password", JOptionPane.QUESTION_MESSAGE);
+
+	if(response2.length() > 0){settingsx[8] = response2;}//************************
+
+	}//***************************
+
+
+
 
 
 //***************************************************************************************************************************************
@@ -1137,8 +1418,16 @@ mcl(){//************************************************************************
 public void actionPerformed(ActionEvent event){
 
 
+	if(event.getSource() == add_contentp)               {add_content_key();}
+	if(event.getSource() == add_miner_url)              {add_miner_url_go();}
+	if(event.getSource() == add_miner_user)             {add_miner_user_go();}
+	if(event.getSource() == add_miner_pass)             {add_miner_pass_go();}
+
+
+
+
 	if(event.getSource() == button1)                    {new_content_window();}
-	if(event.getSource() == button2)                    {}
+	if(event.getSource() == button2)                    {push_new_content();}
 	if(event.getSource() == button3)                    {}
 	if(event.getSource() == button4)                    {}
 	if(event.getSource() == button5)                    {}
@@ -1147,7 +1436,7 @@ public void actionPerformed(ActionEvent event){
 
 
 
-	//if(event.getSource() == exit)                     {krypton_save_settings(); System.exit(0);}
+	if(event.getSource() == exit)                       {System.exit(0);}
 	if(event.getSource() == kconsole)                   {krypton k = new krypton();}
 
 
